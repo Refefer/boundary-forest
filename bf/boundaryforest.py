@@ -2,6 +2,11 @@ from collections import defaultdict
 
 import numpy as np
 from sklearn.metrics import accuracy_score
+from sklearn.base import BaseEstimator, ClassifierMixin
+
+from .distance import Euclidean
+from .ld import Index
+from .estimator import ShepardClassifier
 
 class Node(object):
     def __init__(self, idx):
@@ -62,10 +67,10 @@ class BoundaryTree(object):
         node_score, node = self._traverse(y)
         return node_score, self.table[node.idx][1]
 
-class BoundaryForest(object):
+class BoundaryForest(BaseEstimator):
     def __init__(self, n_trees, k, 
-            distance       = EucDist(), 
-            label_distance = EqualDist(),
+            distance       = Euclidean(), 
+            label_distance = Index(),
             estimator      = ShepardClassifier(),
             assignment     = None,
             seed           = 2018):
@@ -152,20 +157,3 @@ class BoundaryForest(object):
 
     def score(self, X, y):
         return accuracy_score(y, self.predict(X))
-
-def BFClassifier(n_trees, k, **kwargs):
-    return BoundaryForest(n_trees, k, **kwargs)
-
-def BFRegressor(n_trees, k, threshold, weight='distance'):
-
-    assert weight in ('distance', 'uniform')
-    if weight == 'distance':
-        estimator = ShepardRegressor()
-    else:
-        estimator = UniformRegressor()
-
-    label_distance = ThresholdDist(threshold)
-    return BoundaryForest(n_trees, k, 
-            label_distance=label_distance, 
-            estimator=estimator)
-
