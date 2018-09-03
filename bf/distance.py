@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.distance import cdist
 
 class Distance(object):
     def compare(self, x, y):
@@ -16,7 +17,8 @@ class LambdaMetric(Distance):
 
 class Euclidean(Distance):
     def compare(self, x, y):
-        if isinstance(x, np.ndararray):
+        if isinstance(x, np.ndarray):
+            #return cdist(x, y)
             return ((x - y) ** 2).sum()
 
         return (x - y).power(2).sum()

@@ -7,6 +7,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from .distance import Euclidean
 from .ld import Index
 from .estimator import ShepardClassifier
+from .assignment import All
 
 class Node(object):
     def __init__(self, idx):
@@ -73,16 +74,8 @@ class BoundaryForest(BaseEstimator):
             label_distance = Index(),
             estimator      = ShepardClassifier(),
             assignment     = None,
+            verbose        = False,
             seed           = 2018):
-
-        if not isinstance(distance, DistMetric):
-            if callable(distance):
-                distance = LambdaMetric(distance)
-            else:
-                raise AssertionError("Distance isn't a DistMetric or callable!")
-
-        if assignment is None:
-            assignment = All(seed + 1)
 
         self.k = k
         self.n_trees = n_trees
@@ -90,6 +83,11 @@ class BoundaryForest(BaseEstimator):
         self.label_distance = label_distance
         self.estimator = estimator
         self.assignment = assignment
+        if self.assignment is not None:
+            self.assignment.set_trees(n_trees)
+            self.assignment.setup()
+
+        self.verbose = verbose
         self.seed = seed
 
     def _add(self, y, cy):
@@ -106,11 +104,12 @@ class BoundaryForest(BaseEstimator):
 
     def insert(self, xi, yi):
         idx = self._add(xi, yi)
-        subtrees = self.assignment.assignments(len(self.trees))
+        if self.assignment is not None:
+            subtrees = self.assignment.assignments(len(self.trees))
 
         added = False
         for i, t in enumerate(self.trees):
-            if subtrees[i]:
+            if self.assignment is None or subtrees[i]:
                 added |= t.insert(idx)
 
         if not added:
@@ -120,7 +119,10 @@ class BoundaryForest(BaseEstimator):
         if not hasattr(self, 'trees'):
             self._init()
 
-        for i in range(offset, X.shape[0]):
+        for i in range(offset, len(X)):
+            if i % 1000 == 0 and self.verbose:
+                print("Added {} examples".format(i))
+
             self.insert(X[i], y[i])
 
     def fit(self, X, y):
@@ -128,7 +130,7 @@ class BoundaryForest(BaseEstimator):
         
         # Add all to table
         subset = []
-        for i in range(min(len(self.trees), X.shape[0])):
+        for i in range(min(len(self.trees), len(X))):
             subset.append(self._add(X[i], y[i]))
 
         added_idxs = set()
@@ -149,7 +151,10 @@ class BoundaryForest(BaseEstimator):
 
     def predict(self, X):
         y_hat = []
-        for xi in X:
+        for i, xi in enumerate(X):
+            if i % 1000 == 0 and self.verbose:
+                print("Predicted {} examples".format(i))
+
             scores = [t.query(xi) for t in self.trees]
             y_hat.append(self.estimator.score(scores)[0])
 
